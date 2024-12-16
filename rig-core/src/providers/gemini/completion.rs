@@ -3,6 +3,8 @@
 //! From [Gemini API Reference](https://ai.google.dev/api/generate-content)
 // ================================================================
 
+/// `gemini-2.0-flash` completion model
+pub const GEMINI_2_0_FLASH: &str = "gemini-2.0-flash";
 /// `gemini-1.5-flash` completion model
 pub const GEMINI_1_5_FLASH: &str = "gemini-1.5-flash";
 /// `gemini-1.5-pro` completion model
@@ -13,8 +15,7 @@ pub const GEMINI_1_5_PRO_8B: &str = "gemini-1.5-pro-8b";
 pub const GEMINI_1_0_PRO: &str = "gemini-1.0-pro";
 
 use gemini_api_types::{
-    Content, ContentCandidate, FunctionDeclaration, GenerateContentRequest,
-    GenerateContentResponse, GenerationConfig, Part, Role, Tool,
+    Content, ContentCandidate, FunctionDeclaration, GeminiToolSchema, GenerateContentRequest, GenerateContentResponse, GenerationConfig, Part, Role, Schema, Tool
 };
 use serde_json::{Map, Value};
 use std::convert::TryFrom;
@@ -112,6 +113,8 @@ impl completion::CompletionModel for CompletionModel {
 
         tracing::debug!("Sending completion request to Gemini API");
 
+        tracing::debug!("{}",serde_json::to_string_pretty(&request).unwrap());
+
         let response = self
             .client
             .post(&format!("/v1beta/models/{}:generateContent", self.model))
@@ -141,11 +144,11 @@ impl completion::CompletionModel for CompletionModel {
 impl From<completion::ToolDefinition> for Tool {
     fn from(tool: completion::ToolDefinition) -> Self {
         Self {
-            function_declaration: FunctionDeclaration {
+            function_declarations: vec![FunctionDeclaration {
                 name: tool.name,
                 description: tool.description,
-                parameters: None, // tool.parameters, TODO: Map Gemini
-            },
+                parameters: GeminiToolSchema::try_from(tool.parameters).unwrap(),
+            }],
             code_execution: None,
         }
     }
@@ -570,6 +573,57 @@ pub mod gemini_api_types {
         pub required: Option<Vec<String>>,
         pub items: Option<Box<Schema>>,
     }
+    
+    #[derive(Debug, Serialize)]
+pub struct GeminiToolSchema {
+    pub r#type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub properties: Option<HashMap<String, GeminiToolSchema>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<Vec<String>>,
+}
+
+impl TryFrom<Value> for GeminiToolSchema {
+    type Error = CompletionError;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Some(obj) = value.as_object() {
+            tracing::debug!("GeminiToolSchema: {:?}", obj);
+            
+            let properties = if obj.get("type").and_then(|v| v.as_str()) == Some("object") {
+                obj.get("properties")
+                    .and_then(|props| props.as_object())
+                    .map(|props_map| {
+                        props_map
+                            .iter()
+                            .filter_map(|(key, value)| {
+                                GeminiToolSchema::try_from(value.clone())
+                                    .ok()
+                                    .map(|schema| (key.clone(), schema))
+                            })
+                            .collect::<HashMap<String, GeminiToolSchema>>()
+                    })
+            } else {
+                None
+            };
+
+            Ok(GeminiToolSchema {
+                r#type: obj
+                    .get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                properties,
+                required: obj.get("required").and_then(|v| v.as_array()).map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                }),
+            })
+        } else {
+            Err(CompletionError::ResponseError("Expected a JSON object for GeminiToolSchema".into()))
+        }
+    }
+}
 
     impl TryFrom<Value> for Schema {
         type Error = CompletionError;
@@ -659,7 +713,7 @@ pub mod gemini_api_types {
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct Tool {
-        pub function_declaration: FunctionDeclaration,
+        pub function_declarations: Vec<FunctionDeclaration>,
         pub code_execution: Option<CodeExecution>,
     }
 
@@ -668,7 +722,7 @@ pub mod gemini_api_types {
     pub struct FunctionDeclaration {
         pub name: String,
         pub description: String,
-        pub parameters: Option<Vec<Schema>>,
+        pub parameters: GeminiToolSchema,
     }
 
     #[derive(Debug, Serialize)]

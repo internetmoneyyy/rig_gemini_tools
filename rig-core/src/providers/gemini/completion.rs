@@ -113,8 +113,6 @@ impl completion::CompletionModel for CompletionModel {
 
         tracing::debug!("Sending completion request to Gemini API");
 
-        tracing::debug!("{}",serde_json::to_string_pretty(&request).unwrap());
-
         let response = self
             .client
             .post(&format!("/v1beta/models/{}:generateContent", self.model))

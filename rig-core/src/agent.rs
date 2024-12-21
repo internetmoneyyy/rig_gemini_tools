@@ -160,6 +160,8 @@ pub struct Agent<M: CompletionModel> {
     dynamic_tools: Vec<(usize, Box<dyn VectorStoreIndexDyn>)>,
     /// Actual tool implementations
     pub tools: ToolSet,
+    /// Maximum number of turns for the agent
+    max_turns: usize,
 }
 
 impl<M: CompletionModel> Completion<M> for Agent<M> {
@@ -253,16 +255,39 @@ impl<M: CompletionModel> Prompt for Agent<M> {
 
 impl<M: CompletionModel> Chat for Agent<M> {
     async fn chat(&self, prompt: &str, chat_history: Vec<Message>) -> Result<String, PromptError> {
-        match self.completion(prompt, chat_history).await?.send().await? {
-            CompletionResponse {
-                choice: ModelChoice::Message(msg),
-                ..
-            } => Ok(msg),
-            CompletionResponse {
-                choice: ModelChoice::ToolCall(toolname, args),
-                ..
-            } => Ok(self.tools.call(&toolname, args.to_string()).await?),
+        let mut current_prompt = prompt.to_string();
+        let mut current_history = chat_history;
+        
+        for turn in 0..self.max_turns {
+            let response = self.completion(&current_prompt, current_history.clone()).await?.send().await?;
+            
+            match response.choice {
+                ModelChoice::Message(msg) => return Ok(msg),
+                ModelChoice::ToolCall(toolname, args) => {
+                    if turn >= self.max_turns {
+                        return Err(PromptError::CompletionError(CompletionError::ResponseError("Exceeded maximum number of tool calls".into())));
+                    }
+
+                    let tool_result = self.tools.call(&toolname, args.to_string()).await?;
+                    
+                    current_history.push(Message {
+                        role: "assistant".to_string(),
+                        content: format!("Using tool: {}", toolname),
+                    });
+
+                    current_history.push(Message {
+                        role: "system".to_string(),
+                        content: format!("Tool result: {}", tool_result),
+                    });
+
+                    current_prompt.push_str("You now have received a function call result. If you have enough data to answer the prompt, please do so. Otherwise, use the tool again to fetch more data.");
+                }
+            }
         }
+
+        Err(PromptError::CompletionError(CompletionError::ResponseError(
+            "Maximum number of turns reached without final response".into()
+        )))
     }
 }
 
@@ -308,6 +333,8 @@ pub struct AgentBuilder<M: CompletionModel> {
     temperature: Option<f64>,
     /// Actual tool implementations
     tools: ToolSet,
+    /// Maximum number of turns for the agent
+    max_turns: usize,
 }
 
 impl<M: CompletionModel> AgentBuilder<M> {
@@ -323,6 +350,7 @@ impl<M: CompletionModel> AgentBuilder<M> {
             dynamic_context: vec![],
             dynamic_tools: vec![],
             tools: ToolSet::default(),
+            max_turns: 1,
         }
     }
 
@@ -403,6 +431,11 @@ impl<M: CompletionModel> AgentBuilder<M> {
         self
     }
 
+    pub fn max_turns(mut self, max_turns: usize) -> Self {
+        self.max_turns = max_turns;
+        self
+    }
+
     /// Build the agent
     pub fn build(self) -> Agent<M> {
         Agent {
@@ -416,6 +449,8 @@ impl<M: CompletionModel> AgentBuilder<M> {
             dynamic_context: self.dynamic_context,
             dynamic_tools: self.dynamic_tools,
             tools: self.tools,
+            max_turns: self.max_turns,
         }
     }
 }
+

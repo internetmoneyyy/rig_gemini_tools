@@ -3,8 +3,8 @@
 //! From [Gemini API Reference](https://ai.google.dev/api/generate-content)
 // ================================================================
 
-/// `gemini-2.0-flash` completion model
-pub const GEMINI_2_0_FLASH: &str = "gemini-2.0-flash";
+/// `gemini-2.0-flash-exp` completion model
+pub const GEMINI_2_0_FLASH: &str = "gemini-2.0-flash-exp";
 /// `gemini-1.5-flash` completion model
 pub const GEMINI_1_5_FLASH: &str = "gemini-1.5-flash";
 /// `gemini-1.5-pro` completion model
@@ -112,6 +112,8 @@ impl completion::CompletionModel for CompletionModel {
         };
 
         tracing::debug!("Sending completion request to Gemini API");
+
+        tracing::debug!("{}",serde_json::to_string_pretty(&request).unwrap());
 
         let response = self
             .client

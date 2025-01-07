@@ -122,21 +122,7 @@ impl completion::CompletionModel for CompletionModel {
         };
 
         let redacted_request = GenerateContentRequest {
-            contents: full_history
-                .into_iter()
-                .map(|msg| Content {
-                    parts: vec![Part {
-                        text: Some(msg.content.to_string()),
-                        ..Default::default()
-                    }],
-                    role: match msg.role.as_str() {
-                        "system" => Some(Role::Model),
-                        "user" => Some(Role::User),
-                        "assistant" => Some(Role::Model),
-                        _ => None,
-                    },
-                })
-                .collect(),
+            contents: vec![],
             generation_config: Some(secondary_generation_config),
             safety_settings: None,
             tools: Some(

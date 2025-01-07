@@ -66,20 +66,27 @@ impl completion::CompletionModel for CompletionModel {
         let additional_params = completion_request
             .additional_params
             .unwrap_or_else(|| Value::Object(Map::new()));
-        let mut generation_config = serde_json::from_value::<GenerationConfig>(additional_params)?;
+        let mut generation_config =
+            serde_json::from_value::<GenerationConfig>(additional_params.clone())?;
+
+        let mut secondary_generation_config =
+            serde_json::from_value::<GenerationConfig>(additional_params)?;
 
         // Set temperature from completion_request or additional_params
         if let Some(temp) = completion_request.temperature {
             generation_config.temperature = Some(temp);
+            secondary_generation_config.temperature = Some(temp);
         }
 
         // Set max_tokens from completion_request or additional_params
         if let Some(max_tokens) = completion_request.max_tokens {
             generation_config.max_output_tokens = Some(max_tokens);
+            secondary_generation_config.max_output_tokens = Some(max_tokens);
         }
 
         let request = GenerateContentRequest {
             contents: full_history
+                .clone()
                 .into_iter()
                 .map(|msg| Content {
                     parts: vec![Part {
@@ -99,6 +106,7 @@ impl completion::CompletionModel for CompletionModel {
             tools: Some(
                 completion_request
                     .tools
+                    .clone()
                     .into_iter()
                     .map(Tool::from)
                     .collect(),
@@ -113,16 +121,47 @@ impl completion::CompletionModel for CompletionModel {
             }),
         };
 
-        tracing::debug!("Sending completion request to Gemini API");
+        let redacted_request = GenerateContentRequest {
+            contents: full_history
+                .into_iter()
+                .map(|msg| Content {
+                    parts: vec![Part {
+                        text: Some(msg.content.to_string()),
+                        ..Default::default()
+                    }],
+                    role: match msg.role.as_str() {
+                        "system" => Some(Role::Model),
+                        "user" => Some(Role::User),
+                        "assistant" => Some(Role::Model),
+                        _ => None,
+                    },
+                })
+                .collect(),
+            generation_config: Some(secondary_generation_config),
+            safety_settings: None,
+            tools: Some(
+                completion_request
+                    .tools
+                    .into_iter()
+                    .map(Tool::from)
+                    .collect(),
+            ),
+            tool_config: None,
+            system_instruction: Some(Content {
+                parts: vec![Part {
+                    text: Some("system".to_string()),
+                    ..Default::default()
+                }],
+                role: Some(Role::Model),
+            }),
+        };
 
         let _ = Tracer::global()
             .log(
                 LogLevel::INFO,
-                &serde_json::to_string_pretty(&request).unwrap(),
+                &serde_json::to_string_pretty(&redacted_request).unwrap(),
             )
             .await;
-
-        tracing::debug!("{}", serde_json::to_string_pretty(&request).unwrap());
 
         let response = self
             .client

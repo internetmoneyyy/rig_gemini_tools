@@ -146,6 +146,7 @@ impl completion::CompletionModel for CompletionModel {
             .log(
                 LogLevel::INFO,
                 &serde_json::to_string_pretty(&redacted_request).unwrap(),
+                &module_path!().to_string(),
             )
             .await;
 

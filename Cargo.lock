@@ -2030,9 +2030,9 @@ dependencies = [
 
 [[package]]
 name = "event-listener"
-version = "5.3.1"
+version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6032be9bd27023a771701cc49f9f053c751055f71efb2e0ae5c15809093675ba"
+checksum = "3492acde4c3fc54c845eaab3eed8bd00c7a7d881f78bfc801e43a93dec1331ae"
 dependencies = [
  "concurrent-queue",
  "parking",
@@ -2045,7 +2045,7 @@ version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c3e4e0dd3673c1139bf041f3008816d9cf2946bbfac2945c09e523b8d7b05b2"
 dependencies = [
- "event-listener 5.3.1",
+ "event-listener 5.4.0",
  "pin-project-lite",
 ]
 
@@ -3980,7 +3980,7 @@ dependencies = [
 [[package]]
 name = "nats-tracer"
 version = "0.1.0"
-source = "git+https://github.com/internetmoneyyy/nats_tracer.git#c3caa4c5bd11d1d778eca34ce7421d1a7b165284"
+source = "git+https://github.com/internetmoneyyy/nats_tracer.git#d03cac156c0d712c995d1a0b8d7acd994374661b"
 dependencies = [
  "anyhow",
  "async-nats",

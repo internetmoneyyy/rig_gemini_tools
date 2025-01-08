@@ -122,7 +122,13 @@ impl completion::CompletionModel for CompletionModel {
         };
 
         let redacted_request = GenerateContentRequest {
-            contents: vec![],
+            contents: vec![Content {
+                parts: vec![Part {
+                    text: Some("REDACTED PROMPT".to_string()),
+                    ..Default::default()
+                }],
+                role: Some(Role::User),
+            }],
             generation_config: Some(secondary_generation_config),
             safety_settings: None,
             tools: Some(

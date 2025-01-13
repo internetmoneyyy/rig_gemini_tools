@@ -253,6 +253,12 @@ impl<M: CompletionModel> Prompt for Agent<M> {
     }
 }
 
+impl<M: CompletionModel> Prompt for &Agent<M> {
+    async fn prompt(&self, prompt: &str) -> Result<String, PromptError> {
+        self.chat(prompt, vec![]).await
+    }
+}
+
 impl<M: CompletionModel> Chat for Agent<M> {
     async fn chat(&self, prompt: &str, chat_history: Vec<Message>) -> Result<String, PromptError> {
         let mut current_prompt = prompt.to_string();

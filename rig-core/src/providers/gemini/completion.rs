@@ -18,7 +18,6 @@ use gemini_api_types::{
     Content, ContentCandidate, FunctionDeclaration, GeminiToolSchema, GenerateContentRequest,
     GenerateContentResponse, GenerationConfig, Part, Role, Schema, Tool,
 };
-use nats_tracer::{LogLevel, Tracer};
 use serde_json::{Map, Value};
 use std::convert::TryFrom;
 
@@ -147,14 +146,6 @@ impl completion::CompletionModel for CompletionModel {
                 role: Some(Role::Model),
             }),
         };
-
-        let _ = Tracer::global()
-            .log(
-                LogLevel::INFO,
-                &serde_json::to_string_pretty(&redacted_request).unwrap(),
-                &module_path!().to_string(),
-            )
-            .await;
 
         let response = self
             .client

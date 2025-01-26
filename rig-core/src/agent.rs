@@ -286,7 +286,7 @@ impl<M: CompletionModel> Chat for Agent<M> {
                         content: format!("Tool result: {}", tool_result),
                     });
 
-                    current_prompt.push_str(format!(
+                    current_prompt.push_str(&format!(
                 "Tool returned: {}. If this result fully answers the original request, return it as your final response. Only make another tool call if absolutely necessary to fulfill the original request.",
                 tool_result
             ));

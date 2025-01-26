@@ -286,7 +286,10 @@ impl<M: CompletionModel> Chat for Agent<M> {
                         content: format!("Tool result: {}", tool_result),
                     });
 
-                    current_prompt.push_str("You now have received a function call result. If you have enough data to answer the prompt, please do so. Otherwise, use the tool again to fetch more data.");
+                    current_prompt.push_str(format!(
+                "Tool returned: {}. If this result fully answers the original request, return it as your final response. Only make another tool call if absolutely necessary to fulfill the original request.",
+                tool_result
+            ));
                 }
             }
         }
